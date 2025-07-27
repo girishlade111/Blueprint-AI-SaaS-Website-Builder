@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Blueprint: SaaS AI Website Builder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: "Cosmic Night" - A dark theme using deep slate grays for the background with sky blue and teal as primary and secondary accents. Light-colored text ensures high contrast and readability. -->
+    <!-- Application Structure Plan: The application is structured as a single-page dashboard with a sticky top navigation, allowing users to jump to key pillars of the technical blueprint. This non-linear structure is chosen because a blueprint is a reference document, not a narrative. Users (e.g., developers, project managers) need to quickly access specific sections like "AI Core" or "Architecture" without scrolling through unrelated content. The flow is designed for exploration, with high-level summaries in each section and interactive elements (charts, diagrams, clickable cards) to drill down into details. This approach enhances usability by making complex information digestible and easily accessible based on the user's immediate interest. -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: Competitive Analysis (Table 1). Goal: Compare platforms. Viz: Interactive Radar Chart (Chart.js). Interaction: Hover tooltips. Justification: A radar chart is superior to a table for comparing multiple entities across multiple quantitative dimensions, offering an immediate visual summary of strengths and weaknesses. Library: Chart.js.
+        - Report Info: Generation Pipeline (Sec 2.3). Goal: Organize process. Viz: HTML/CSS Flowchart. Interaction: Click to expand details in a modal. Justification: A visual flowchart clarifies the sequence and dependencies of the pipeline steps more effectively than a list. Method: HTML/CSS with JS for interaction.
+        - Report Info: Database Schema (Sec 3.2). Goal: Organize data structure. Viz: Interactive HTML/CSS Diagram. Interaction: Click on a model to see its Prisma code in a modal, with an AI-powered explanation. Justification: An interactive diagram makes the complex relationships between data models tangible and easier to understand. Method: HTML/CSS with JS and Gemini API.
+        - Report Info: Go-to-Market Strategy. Goal: Brainstorm ideas. Viz: Interactive text input and generated list. Interaction: User provides a target audience, clicks a button. Justification: This moves beyond static content, making the blueprint a generative tool for strategic planning. Method: HTML/CSS with JS and Gemini API.
+        - Report Info: Project Scaffolding. Goal: Plan architecture. Viz: Interactive text input and generated lists. Interaction: User describes a project, AI suggests models and endpoints. Justification: This makes the blueprint an active architectural planning tool. Method: HTML/CSS with JS and Gemini API.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* slate-900 */
+            color: #cbd5e1; /* slate-300 */
+        }
+        .nav-link {
+            transition: color 0.2s, border-bottom-color 0.2s;
+            border-bottom: 2px solid transparent;
+        }
+        .nav-link:hover, .nav-link.active {
+            color: #38bdf8; /* sky-400 */
+            border-bottom-color: #38bdf8; /* sky-400 */
+        }
+        .section-title {
+            color: #f8fafc; /* slate-50 */
+        }
+        .card {
+            background-color: #1e293b; /* slate-800 */
+            border: 1px solid #334155; /* slate-700 */
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        .flowchart-step {
+            position: relative;
+            z-index: 1;
+        }
+        .flowchart-step:not(:last-child)::after {
+            content: '→';
+            position: absolute;
+            right: -2.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 2rem;
+            color: #475569; /* slate-600 */
+            z-index: -1;
+        }
+        @media (max-width: 1024px) {
+            .flowchart-step:not(:last-child)::after {
+                content: '↓';
+                right: 50%;
+                top: 100%;
+                transform: translateX(50%);
+            }
+        }
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+        .modal-backdrop.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        .modal-content {
+            background: #1e293b; /* slate-800 */
+            color: #e2e8f0; /* slate-200 */
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            max-width: 90%;
+            width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            transform: scale(0.95);
+            transition: transform 0.3s;
+            border: 1px solid #334155;
+        }
+        .modal-backdrop.visible .modal-content {
+            transform: scale(1);
+        }
+        .db-table {
+            cursor: pointer;
+            border: 2px solid #334155; /* slate-700 */
+            transition: all 0.2s;
+        }
+        .db-table:hover {
+            border-color: #0ea5e9; /* sky-500 */
+            background-color: #334155; /* slate-700 */
+        }
+        pre {
+            background-color: #0f172a !important; /* slate-900 */
+            border: 1px solid #334155;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+            overflow-x: auto;
+        }
+        code {
+             color: #e2e8f0;
+        }
+        .sparkle-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: -1;
+        }
+        .sparkle {
+            position: absolute;
+            width: 3px;
+            height: 3px;
+            background-color: #7dd3fc; /* sky-300 */
+            border-radius: 50%;
+            opacity: 0;
+            animation: twinkle 5s infinite;
+        }
+        @keyframes twinkle {
+            0%, 100% { opacity: 0; transform: scale(0.5); }
+            50% { opacity: 0.8; transform: scale(1.2); }
+        }
+        .gemini-button {
+            background-color: #8b5cf6; /* violet-500 */
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+        .gemini-button:hover {
+            background-color: #7c3aed; /* violet-600 */
+        }
+        .gemini-button:disabled {
+            background-color: #475569;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div class="sparkle-background" id="sparkle-container"></div>
+
+    <!-- Header & Navigation -->
+    <header id="header" class="bg-slate-900/80 backdrop-blur-lg sticky top-0 z-40 w-full border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex-shrink-0">
+                    <h1 class="text-xl font-bold text-slate-100">AI SaaS Builder Blueprint</h1>
+                </div>
+                <nav class="hidden md:flex md:space-x-8">
+                    <a href="#strategy" class="nav-link font-medium text-slate-300 py-1">Strategy</a>
+                    <a href="#ai-core" class="nav-link font-medium text-slate-300 py-1">AI Core</a>
+                    <a href="#architecture" class="nav-link font-medium text-slate-300 py-1">Architecture</a>
+                    <a href="#editor" class="nav-link font-medium text-slate-300 py-1">Editor</a>
+                    <a href="#workflows" class="nav-link font-medium text-slate-300 py-1">Workflows</a>
+                    <a href="#advanced" class="nav-link font-medium text-slate-300 py-1">Advanced</a>
+                    <a href="#deployment" class="nav-link font-medium text-slate-300 py-1">Deployment</a>
+                </nav>
+                 <div class="md:hidden">
+                    <select id="mobile-nav" class="block w-full rounded-md border-slate-600 bg-slate-800 text-white shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm">
+                        <option value="#strategy">Strategy</option>
+                        <option value="#ai-core">AI Core</option>
+                        <option value="#architecture">Architecture</option>
+                        <option value="#editor">Editor</option>
+                        <option value="#workflows">Workflows</option>
+                        <option value="#advanced">Advanced</option>
+                        <option value="#deployment">Deployment</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+
+        <!-- Intro Section -->
+        <section class="text-center mb-20">
+            <h2 class="text-4xl font-bold tracking-tight text-slate-50 sm:text-5xl">An Interactive Technical Blueprint</h2>
+            <p class="mt-6 text-lg leading-8 text-slate-400 max-w-3xl mx-auto">This document deconstructs the plan for a SaaS AI Website Builder. Explore the core components, from market strategy and AI engineering to system architecture and deployment, using the interactive elements below.</p>
+        </section>
+
+        <!-- Strategy Section -->
+        <section id="strategy" class="mb-24 scroll-mt-20">
+            <div class="text-center mb-12">
+                <h2 class="section-title text-3xl font-bold tracking-tight">1. Strategic Analysis</h2>
+                <p class="mt-4 text-lg text-slate-400">This section outlines the competitive landscape, identifies a strategic market niche, and defines the Minimum Viable Product (MVP). The goal is to position our builder as a tool for professional developers who need to generate the entire architecture for a modern SaaS application.</p>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center mb-12">
+                <div class="card p-6">
+                    <h3 class="text-xl font-semibold text-slate-100 mb-4">Competitive Philosophy</h3>
+                    <p class="text-slate-300 mb-6">The market is defined by a spectrum from simplicity to control. We analyze two key players to define our position as the go-to tool for generating the *entire architecture* of a modern SaaS application, not just its UI.</p>
+                    <div class="space-y-4">
+                        <div class="p-4 bg-slate-700/50 rounded-lg">
+                            <h4 class="font-semibold text-sky-400">Lovable.dev: Abstraction & Collaboration</h4>
+                            <p class="text-sm text-slate-400">Targets non-technical users with a guided, chat-based workflow. Focuses on ease-of-use and team collaboration, abstracting code away via GitHub sync. Excellent for teams where non-technical members need to contribute.</p>
+                        </div>
+                        <div class="p-4 bg-slate-700/50 rounded-lg">
+                            <h4 class="font-semibold text-teal-400">Bolt.new: Control & Flexibility</h4>
+                            <p class="text-sm text-slate-400">Empowers developers with an in-browser IDE for real-time code editing and rapid iteration. Supports a wide array of frameworks, making it ideal for prototyping and experimentation.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card p-6">
+                    <h3 class="text-xl font-semibold text-slate-100 mb-4 text-center">Competitive Feature Matrix</h3>
+                    <p class="text-slate-400 mb-4 text-center text-sm">This chart compares key platforms across core attributes. Our proposed SaaS aims to lead in 'Full-Stack Architecture' and 'Developer Control', carving a niche for professional builders.</p>
+                    <div class="chart-container relative h-80 md:h-96 w-full max-w-lg mx-auto">
+                        <canvas id="competitiveChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="card p-8">
+                <h3 class="text-2xl font-semibold text-slate-100 mb-6 text-center">Minimum Viable Product (MVP) Definition</h3>
+                <p class="text-slate-400 mb-8 text-center max-w-2xl mx-auto">Our MVP is strategically designed to deliver core value to our target persona—the Professional Developer & SaaS Founder—while managing initial complexity. The focus is on a high-quality, full-stack generation experience.</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                        <h4 class="text-lg font-semibold text-sky-400 mb-3">Core Features</h4>
+                        <ul class="space-y-2 list-disc list-inside text-slate-300">
+                            <li>Natural language prompt-to-code generation.</li>
+                            <li>Focused Tech Stack: Next.js 15, React, Tailwind CSS.</li>
+                            <li>Split-screen editor with live, sandboxed preview.</li>
+                            <li>User authentication and project management.</li>
+                            <li>Asynchronous generation via Inngest for a non-blocking UI.</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-semibold text-rose-400 mb-3">Deferred Features (Post-MVP)</h4>
+                        <ul class="space-y-2 list-disc list-inside text-slate-300">
+                            <li>Direct, in-browser code editing.</li>
+                            <li>Support for additional frameworks (Svelte, Vue).</li>
+                            <li>Advanced collaboration tools.</li>
+                            <li>The high-risk, high-reward "Clone from URL" feature.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- AI Core Section -->
+        <section id="ai-core" class="mb-24 scroll-mt-20">
+            <div class="text-center mb-12">
+                <h2 class="section-title text-3xl font-bold tracking-tight">2. The AI Core</h2>
+                <p class="mt-4 text-lg text-slate-400">The heart of the builder is its AI Core—a sophisticated system built *around* an LLM. It's not just an API call; it's an engineered pipeline that ensures high-quality, validated, and secure code generation. Click on a step to learn more.</p>
+            </div>
+            <div id="pipeline-container" class="flex flex-col lg:flex-row justify-center items-center gap-x-12 gap-y-16">
+                <!-- Pipeline steps will be injected here by JS -->
+            </div>
+             <div class="mt-16">
+                <h3 class="text-2xl font-semibold text-slate-100 mb-6 text-center">Advanced Prompt Engineering</h3>
+                <p class="text-slate-400 mb-8 text-center max-w-3xl mx-auto">We don't just ask the AI for code. We engineer a structured conversation using advanced techniques to guide the LLM towards a correct, high-quality, and secure output.</p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="card p-6">
+                        <h4 class="font-semibold text-sky-400 mb-2">ReAct Framework</h4>
+                        <p class="text-sm text-slate-400">The AI can **Reason** (plan its steps) and **Act** (use tools like a code validator or component library search). This grounds the AI's output in verifiable facts, reducing errors.</p>
+                    </div>
+                    <div class="card p-6">
+                        <h4 class="font-semibold text-sky-400 mb-2">Chain-of-Thought (CoT)</h4>
+                        <p class="text-sm text-slate-400">We instruct the AI to "think step-by-step" before writing code. This produces more logical, well-structured components and makes the AI's process transparent for debugging.</p>
+                    </div>
+                    <div class="card p-6">
+                        <h4 class="font-semibold text-sky-400 mb-2">Expert Personas</h4>
+                        <p class="text-sm text-slate-400">The prompt assigns the AI a role: "You are an expert senior engineer specializing in accessible, production-grade Next.js apps." This primes the model to follow best practices.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Architecture Section -->
+        <section id="architecture" class="mb-24 scroll-mt-20">
+            <div class="text-center mb-12">
+                <h2 class="section-title text-3xl font-bold tracking-tight">3. Platform Architecture</h2>
+                <p class="mt-4 text-lg text-slate-400">A scalable, secure, and multi-tenant architecture is the foundation of our SaaS platform. We use Next.js 15, Prisma, and NextAuth.js to build a robust system designed for professional developers.</p>
+            </div>
+            <div class="card p-8 mb-12">
+                <h3 class="text-2xl font-semibold text-slate-100 mb-6">Multi-Tenant Database Schema</h3>
+                <p class="text-slate-400 mb-8">We use a row-level security model where every piece of data is tied to a `tenantId`. This ensures strict data isolation between users. Click on a table below to view its Prisma schema definition and understand its role in the system.</p>
+                <div id="db-schema-diagram" class="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+                    <!-- DB tables will be injected here by JS -->
+                </div>
+            </div>
+            <div class="card p-8 mb-12">
+                <h3 class="text-2xl font-semibold text-slate-100 mb-6 text-center">✨ AI Project Scaffolder</h3>
+                <p class="text-slate-400 mb-6 text-center max-w-2xl mx-auto">Need a starting point? Describe your application, and our AI assistant will generate a recommended database schema and API endpoint structure.</p>
+                <div class="max-w-xl mx-auto">
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <input type="text" id="scaffold-input" class="w-full bg-slate-700 border-slate-600 rounded-md px-4 py-2 text-white placeholder-slate-400 focus:ring-sky-500 focus:border-sky-500" placeholder="e.g., A blog with users and comments">
+                        <button id="scaffold-button" class="gemini-button w-full sm:w-auto flex-shrink-0">Scaffold Project</button>
+                    </div>
+                    <div id="scaffold-output" class="mt-6 text-slate-300 bg-slate-900/50 p-4 rounded-lg min-h-[100px]">
+                        Your AI-generated project scaffold will appear here...
+                    </div>
+                </div>
+            </div>
+             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="card p-6">
+                    <h3 class="text-xl font-semibold text-slate-100 mb-4">Scalable Project Structure</h3>
+                    <p class="text-slate-400 mb-4">A logical project structure is key to maintainability. We adopt a feature-based organization within the Next.js App Router.</p>
+                    <pre><code class="language-bash">/src
+├── app/ (Routing)
+├── components/
+│   ├── ui/ (Shadcn)
+│   └── features/
+├── lib/ (Services, DB)
+├── utils/ (Helpers)
+└── inngest/ (BG Jobs)
+/prisma
+└── schema.prisma
+</code></pre>
+                </div>
+                <div class="card p-6">
+                    <h3 class="text-xl font-semibold text-slate-100 mb-4">Authentication & Payments</h3>
+                    <p class="text-slate-400 mb-4">Robust user management and subscriptions are handled by industry-standard solutions, integrated seamlessly into Next.js.</p>
+                    <ul class="space-y-3">
+                        <li class="flex items-start"><strong class="text-sky-400 w-24 flex-shrink-0">Auth:</strong> <div><strong class="text-slate-200">NextAuth.js</strong> for secure login (Social & Credentials), with route protection via middleware.</div></li>
+                        <li class="flex items-start"><strong class="text-teal-400 w-24 flex-shrink-0">Payments:</strong> <div><strong class="text-slate-200">Stripe</strong> for subscription management, using Checkout sessions and webhooks to sync subscription status to our database.</div></li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Editor Section -->
+        <section id="editor" class="mb-24 scroll-mt-20">
+            <div class="text-center mb-12">
+                <h2 class="section-title text-3xl font-bold tracking-tight">4. Interactive Editor</h2>
+                <p class="mt-4 text-lg text-slate-400">The user-facing editor must provide a seamless experience while enforcing rigorous security. This is achieved by rendering all AI-generated code within a heavily restricted, sandboxed `<iframe>`.</p>
+            </div>
+            <div class="card p-8 mb-12">
+                <h3 class="text-2xl font-semibold text-slate-100 mb-6">Secure Live Preview Engine</h3>
+                <p class="text-slate-400 mb-8">The primary security measure is the `sandbox` attribute on the `<iframe>`. It creates a secure boundary, preventing generated code from accessing the main application's data or performing malicious actions. We follow the principle of least privilege, only enabling what is absolutely necessary.</p>
+                <div class="flex flex-col md:flex-row gap-8 items-center">
+                    <div class="w-full md:w-1/2 bg-slate-900 p-6 rounded-lg border border-slate-700">
+                        <h4 class="font-bold text-slate-100">Parent Application (Your Browser)</h4>
+                        <div class="mt-4 ml-4 border-2 border-dashed border-sky-600 p-4 rounded-lg bg-slate-800">
+                            <h5 class="font-semibold text-sky-400">Sandboxed &lt;iframe&gt;</h5>
+                            <p class="text-sm text-slate-400 mt-2">A completely isolated environment.</p>
+                            <div class="mt-4 ml-4 border-2 border-rose-600 p-4 rounded-lg bg-rose-500/10">
+                                <h6 class="font-semibold text-rose-400">AI-Generated Code</h6>
+                                <p class="text-xs text-slate-500 mt-1">Executes here. Cannot access parent.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="w-full md:w-1/2">
+                        <div class="space-y-3">
+                            <div class="flex items-start">
+                                <span class="text-green-400 font-bold text-xl mr-3">✓</span>
+                                <div><strong class="text-slate-100">Enabled:</strong> `allow-scripts` to run React.</div>
+                            </div>
+                            <div class="flex items-start">
+                                <span class="text-green-400 font-bold text-xl mr-3">✓</span>
+                                <div><strong class="text-slate-100">Enabled:</strong> `allow-same-origin` for resource access within the iframe.</div>
+                            </div>
+                            <div class="flex items-start">
+                                <span class="text-red-400 font-bold text-xl mr-3">✗</span>
+                                <div><strong class="text-slate-100">Disabled:</strong> `allow-top-navigation` to prevent redirects.</div>
+                            </div>
+                            <div class="flex items-start">
+                                <span class="text-red-400 font-bold text-xl mr-3">✗</span>
+                                <div><strong class="text-slate-100">Disabled:</strong> `allow-forms` to block data submission.</div>
+                            </div>
+                            <div class="flex items-start">
+                                <span class="text-red-400 font-bold text-xl mr-3">✗</span>
+                                <div><strong class="text-slate-100">Disabled:</strong> `allow-popups` to prevent annoying modals.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card p-8">
+                <h3 class="text-2xl font-semibold text-slate-100 mb-6">UI Design & Real-Time Updates</h3>
+                <p class="text-slate-400 mb-8">A polished UI and instant feedback are crucial for a great user experience. We use a component-based approach and in-browser transpilation to achieve this.</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                        <h4 class="text-lg font-semibold text-sky-400 mb-3">Component-Driven UI</h4>
+                        <p class="text-slate-300">The entire editor interface is built with React and a professional component library like <strong class="text-slate-100">Shadcn UI</strong>. This ensures a consistent, accessible, and polished look and feel, accelerating development.</p>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-semibold text-teal-400 mb-3">In-Browser Transpilation</h4>
+                        <p class="text-slate-300">To provide a live preview without a slow server build step, we use <strong class="text-slate-100">`@babel/standalone`</strong> to transpile the AI-generated JSX into plain JavaScript directly in the browser, then inject it into the sandboxed iframe.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Workflows Section -->
+        <section id="workflows" class="mb-24 scroll-mt-20">
+            <div class="text-center mb-12">
+                <h2 class="section-title text-3xl font-bold tracking-tight">5. Asynchronous Workflows with Inngest</h2>
+                <p class="mt-4 text-lg text-slate-400">Long-running tasks like AI generation are offloaded to background jobs using Inngest. This ensures a responsive UI and reliable execution. Below is the event-driven workflow for generating and validating a component. Click a function to see its code.</p>
+            </div>
+             <div class="card p-8 mb-12">
+                <h3 class="text-2xl font-semibold text-slate-100 mb-6">Why Asynchronous Workflows?</h3>
+                <p class="text-slate-400 mb-8">Executing complex tasks during a web request is slow and unreliable, leading to timeouts and a poor user experience. We offload these tasks to background jobs to keep the application fast and resilient.</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h4 class="font-semibold text-sky-400 mb-2">Key Use Cases:</h4>
+                        <ul class="list-disc list-inside text-slate-300">
+                            <li>AI Code Generation (can take 30s+)</li>
+                            <li>Multi-step code validation pipelines</li>
+                            <li>"Clone from URL" web scraping</li>
+                            <li>Sending welcome emails after signup</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-teal-400 mb-2">Inngest Benefits:</h4>
+                        <ul class="list-disc list-inside text-slate-300">
+                            <li><strong class="text-slate-100">Durability:</strong> Jobs can run for hours or days.</li>
+                            <li><strong class="text-slate-100">Automatic Retries:</strong> Handles transient API failures.</li>
+                            <li><strong class="text-slate-100">Observability:</strong> Visual debugger for every run.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="card p-8">
+                <h3 class="text-2xl font-semibold text-slate-100 mb-6 text-center">Example: AI Generation Workflow</h3>
+                <div class="flex flex-col lg:flex-row justify-around items-center gap-x-12 gap-y-16">
+                    <div id="inngest-generate" class="flowchart-step text-center p-6 rounded-lg border-2 border-slate-700 bg-slate-800 w-full lg:w-1/3 cursor-pointer hover:border-sky-500 hover:bg-slate-700 transition">
+                        <div class="text-sm font-semibold text-sky-400 mb-2">EVENT TRIGGER</div>
+                        <h4 class="text-lg font-bold text-slate-100">`ai/component.generate.requested`</h4>
+                        <p class="text-sm text-slate-400 mt-2">User prompt received. Triggers the generation function.</p>
+                    </div>
+                    <div id="inngest-validate" class="flowchart-step text-center p-6 rounded-lg border-2 border-slate-700 bg-slate-800 w-full lg:w-1/3 cursor-pointer hover:border-sky-500 hover:bg-slate-700 transition">
+                        <div class="text-sm font-semibold text-sky-400 mb-2">EVENT TRIGGER</div>
+                        <h4 class="text-lg font-bold text-slate-100">`ai/code.validation.requested`</h4>
+                        <p class="text-sm text-slate-400 mt-2">Generated code is sent for validation. Triggers the validation function.</p>
+                    </div>
+                </div>
+                <div id="inngest-code-display" class="mt-8 bg-slate-900 border border-slate-700 rounded-lg p-4 hidden">
+                    <pre><code class="language-typescript text-sm"></code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Advanced Section -->
+        <section id="advanced" class="mb-24 scroll-mt-20">
+            <div class="text-center mb-12">
+                <h2 class="section-title text-3xl font-bold tracking-tight">6. Advanced: "Clone from URL"</h2>
+                <p class="mt-4 text-lg text-slate-400">This powerful feature allows users to bootstrap a design from an existing URL. However, it operates in a legally treacherous area and must be approached with caution and clear user education.</p>
+            </div>
+            <div class="card p-8 mb-12">
+                <h3 class="text-2xl font-semibold text-slate-100 mb-6">Technical Deep-Dive: How Cloning Works</h3>
+                <p class="text-slate-400 mb-8">Cloning is a two-stage process managed by an asynchronous background job. It first scrapes the target site's content and then uses AI to reconstruct it as a new application in our tech stack.</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                        <h4 class="text-lg font-semibold text-sky-400 mb-3">Stage 1: Web Scraping & Asset Extraction</h4>
+                        <p class="text-slate-300">A headless browser (using <strong class="text-slate-100">Puppeteer</strong>) navigates to the URL, waits for the page to fully render, and then extracts the final HTML, CSS, and text content. This handles both static and dynamic JavaScript-heavy sites.</p>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-semibold text-teal-400 mb-3">Stage 2: AI-Powered Reconstruction</h4>
+                        <p class="text-slate-300">The scraped content is fed to our AI Core. The AI analyzes the layout and content, then generates new, clean <strong class="text-slate-100">React components with Tailwind CSS</strong> to visually mimic the original. The result is a brand new codebase, not a direct copy.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="card p-8">
+                <h3 class="text-2xl font-semibold text-slate-100 mb-2">Legal Risk Assessment</h3>
+                <p class="text-slate-400 mb-8">Offering a cloning tool exposes the platform and its users to significant legal liability. The following are the primary risks involved.</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div class="bg-amber-500/10 border-l-4 border-amber-400 p-4 rounded-r-lg">
+                        <h4 class="font-bold text-amber-300">Copyright Infringement</h4>
+                        <p class="text-sm text-amber-400 mt-2">The most significant risk. A site's code, visual design, and content are all protected by copyright. Unauthorized copying can lead to severe statutory damages.</p>
+                    </div>
+                    <div class="bg-amber-500/10 border-l-4 border-amber-400 p-4 rounded-r-lg">
+                        <h4 class="font-bold text-amber-300">Trademark Infringement</h4>
+                        <p class="text-sm text-amber-400 mt-2">Using a company's logo or brand name in a cloned site can create consumer confusion and lead to legal action.</p>
+                    </div>
+                    <div class="bg-amber-500/10 border-l-4 border-amber-400 p-4 rounded-r-lg">
+                        <h4 class="font-bold text-amber-300">DMCA Takedown Notices</h4>
+                        <p class="text-sm text-amber-400 mt-2">Copyright holders can demand the removal of infringing content, creating a significant operational burden for the platform.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Deployment Section -->
+        <section id="deployment" class="scroll-mt-20">
+            <div class="text-center mb-12">
+                <h2 class="section-title text-3xl font-bold tracking-tight">7. Deployment & Go-to-Market</h2>
+                <p class="mt-4 text-lg text-slate-400">The final phase involves deploying the application to production and acquiring our target users: professional developers and SaaS founders.</p>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="card p-6">
+                    <h3 class="text-xl font-semibold text-slate-100 mb-4">Vercel Deployment Checklist</h3>
+                    <p class="text-slate-400 mb-4">Vercel is the ideal platform for deploying our Next.js application. A smooth deployment requires careful configuration of the build process and environment.</p>
+                    <ul class="space-y-3 text-slate-300">
+                        <li class="flex items-center"><span class="h-6 w-6 rounded-full bg-sky-500/20 text-sky-300 font-bold flex items-center justify-center mr-3">1</span>Connect Git repository (GitHub/GitLab) to Vercel.</li>
+                        <li class="flex items-center"><span class="h-6 w-6 rounded-full bg-sky-500/20 text-sky-300 font-bold flex items-center justify-center mr-3">2</span>Add `DATABASE_URL` and all other secrets as Environment Variables.</li>
+                        <li class="flex items-center"><span class="h-6 w-6 rounded-full bg-sky-500/20 text-sky-300 font-bold flex items-center justify-center mr-3">3</span>Ensure `prisma generate` is in the `build` script in `package.json` to generate the client during build.</li>
+                        <li class="flex items-center"><span class="h-6 w-6 rounded-full bg-sky-500/20 text-sky-300 font-bold flex items-center justify-center mr-3">4</span>Run `npx prisma migrate deploy` locally against the production DB before deploying code with schema changes.</li>
+                        <li class="flex items-center"><span class="h-6 w-6 rounded-full bg-sky-500/20 text-sky-300 font-bold flex items-center justify-center mr-3">5</span>Deploy! Vercel handles the rest.</li>
+                    </ul>
+                </div>
+                <div class="card p-6">
+                    <h3 class="text-xl font-semibold text-slate-100 mb-4">Go-to-Market Strategy</h3>
+                    <p class="text-slate-400 mb-4">Our GTM strategy is developer-centric, focused on building trust and demonstrating value within technical communities.</p>
+                     <ul class="space-y-3 text-slate-300">
+                        <li class="flex items-start"><span class="text-teal-400 mt-1 mr-3">▶</span><div><strong class="text-slate-200">Content Marketing:</strong> Create high-value technical tutorials ("Build a CRM with AI in 10 mins") and blog posts that solve real developer problems.</div></li>
+                        <li class="flex items-start"><span class="text-teal-400 mt-1 mr-3">▶</span><div><strong class="text-slate-200">Community Engagement:</strong> Actively participate in developer forums like Reddit (r/nextjs), Dev.to, and Hacker News. Share progress, ask for feedback, and be helpful.</div></li>
+                        <li class="flex items-start"><span class="text-teal-400 mt-1 mr-3">▶</span><div><strong class="text-slate-200">Open Source:</strong> Release parts of the platform (e.g., a component library or a lite version of the AI engine) to build community and trust.</div></li>
+                        <li class="flex items-start"><span class="text-teal-400 mt-1 mr-3">▶</span><div><strong class="text-slate-200">Freemium Model:</strong> Offer a generous free tier that lets developers experience the product's core value before asking them to pay.</div></li>
+                    </ul>
+                </div>
+            </div>
+             <div class="card p-8 mt-12">
+                <h3 class="text-2xl font-semibold text-slate-100 mb-6 text-center">✨ Generate GTM Ideas with AI</h3>
+                <p class="text-slate-400 mb-6 text-center max-w-2xl mx-auto">Need inspiration? Describe your target audience below, and our AI assistant will brainstorm a custom Go-to-Market strategy for you.</p>
+                <div class="max-w-xl mx-auto">
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <input type="text" id="gtm-input" class="w-full bg-slate-700 border-slate-600 rounded-md px-4 py-2 text-white placeholder-slate-400 focus:ring-sky-500 focus:border-sky-500" placeholder="e.g., Indie game developers">
+                        <button id="gtm-button" class="gemini-button w-full sm:w-auto flex-shrink-0">Generate Ideas</button>
+                    </div>
+                    <div id="gtm-output" class="mt-6 text-slate-300 bg-slate-900/50 p-4 rounded-lg min-h-[100px]">
+                        Your AI-generated strategy will appear here...
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+    
+    <footer class="border-t border-slate-700 mt-24 py-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h3 class="text-lg font-semibold text-slate-200 mb-4">Connect with the Creator</h3>
+            <div class="flex justify-center items-center space-x-6 text-slate-400">
+                <a href="https://www.instagram.com/girish_lade_/" target="_blank" rel="noopener noreferrer" class="hover:text-sky-400 transition">Instagram</a>
+                <a href="https://www.linkedin.com/in/girish-lade-075bba201/" target="_blank" rel="noopener noreferrer" class="hover:text-sky-400 transition">LinkedIn</a>
+                <a href="https://github.com/girishlade111" target="_blank" rel="noopener noreferrer" class="hover:text-sky-400 transition">GitHub</a>
+                <a href="https://codepen.io/Girish-Lade-the-looper" target="_blank" rel="noopener noreferrer" class="hover:text-sky-400 transition">Codepen</a>
+                <a href="mailto:girishlade111@gmail.com" class="hover:text-sky-400 transition">Email</a>
+            </div>
+            <p class="text-sm text-slate-500 mt-6">© 2024 AI SaaS Builder Blueprint. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Modal -->
+    <div id="modal" class="modal-backdrop">
+        <div id="modal-content" class="modal-content">
+            <!-- Modal content will be injected here -->
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Gemini API Call Helper ---
+            async function callGemini(prompt) {
+                const apiKey = "AIzaSyDK68voN4wRnCh95nrlu0m9vHbtJKOECqM"; // User-provided API key
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                
+                let chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
+                const payload = { contents: chatHistory };
+
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        const errorBody = await response.text();
+                        console.error(`API call failed with status: ${response.status}`, errorBody);
+                        throw new Error(`API call failed with status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    
+                    if (result.candidates && result.candidates.length > 0 &&
+                        result.candidates[0].content && result.candidates[0].content.parts &&
+                        result.candidates[0].content.parts.length > 0) {
+                        return result.candidates[0].content.parts[0].text;
+                    } else {
+                        console.error("Unexpected API response structure:", result);
+                        return "Sorry, I couldn't get a response from the AI. The response format was unexpected.";
+                    }
+                } catch (error) {
+                    console.error("Error calling Gemini API:", error);
+                    return "Sorry, an error occurred while contacting the AI assistant.";
+                }
+            }
+
+            // Data for visualizations
+            const competitiveData = {
+                labels: ['Developer Control', 'Full-Stack Architecture', 'Collaboration', 'Ease of Use (Non-Tech)', 'Framework Flexibility'],
+                datasets: [{
+                    label: 'Lovable.dev',
+                    data: [1, 2, 3, 3, 1],
+                    backgroundColor: 'rgba(56, 189, 248, 0.2)', // sky-400
+                    borderColor: 'rgba(56, 189, 248, 1)',
+                    pointBackgroundColor: 'rgba(56, 189, 248, 1)',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: 'rgba(56, 189, 248, 1)'
+                }, {
+                    label: 'Bolt.new',
+                    data: [3, 1, 1, 2, 3],
+                    backgroundColor: 'rgba(45, 212, 191, 0.2)', // teal-400
+                    borderColor: 'rgba(45, 212, 191, 1)',
+                    pointBackgroundColor: 'rgba(45, 212, 191, 1)',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: 'rgba(45, 212, 191, 1)'
+                }, {
+                    label: 'Our Proposed SaaS',
+                    data: [3, 3, 1, 2, 2],
+                    backgroundColor: 'rgba(248, 113, 113, 0.2)', // red-400
+                    borderColor: 'rgba(248, 113, 113, 1)',
+                    pointBackgroundColor: 'rgba(248, 113, 113, 1)',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: 'rgba(248, 113, 113, 1)'
+                }]
+            };
+
+            const pipelineSteps = [
+                { title: "Prompt Construction", description: "The system combines the user's raw text with persona instructions, few-shot examples, and existing code context to create a master prompt." },
+                { title: "LLM Invocation", description: "The master prompt is sent to an LLM (e.g., GPT-4o) via an asynchronous Inngest job, preventing UI blocking and server timeouts." },
+                { title: "Output Parsing", description: "The raw text response from the LLM is parsed to reliably extract only the machine-readable code blocks." },
+                { title: "Validation & Sanitization", description: "The extracted code is run through a pipeline of linters (ESLint), formatters (Prettier), type-checkers (TypeScript), and security scanners." },
+                { title: "Self-Refinement Loop", description: "If validation fails, the error messages are fed back to the LLM, instructing it to debug its own output. This loop can run multiple times." },
+                { title: "Store & Deliver", description: "Once validated, the final code is saved to the database and delivered to the user's frontend via a real-time update." }
+            ];
+
+            const dbSchema = {
+                Tenant: {
+                    description: "The root of data isolation. Every user and all their associated data belong to a single tenant.",
+                    code: `model Tenant {\n  id      String  @id @default(cuid())\n  name    String?\n  users   User[]\n  projects Project[]\n}`
+                },
+                User: {
+                    description: "Represents an authenticated user. Linked to a tenant and can own multiple projects.",
+                    code: `model User {\n  id       String @id @default(cuid())\n  email    String? @unique\n  tenantId String\n  tenant   Tenant @relation(fields: [tenantId], references: [id])\n  projects Project[]\n}`
+                },
+                Project: {
+                    description: "A user's project, containing multiple generated components. Always scoped to a tenant.",
+                    code: `model Project {\n  id         String   @id @default(cuid())\n  name       String\n  userId     String\n  user       User     @relation(fields: [userId], references: [id])\n  tenantId   String\n  tenant     Tenant   @relation(fields: [tenantId], references: [id])\n  components GeneratedComponent[]\n  @@index([tenantId])\n}`
+                }
+            };
+
+            const inngestCode = {
+                generate: `export const generateComponent = inngest.createFunction(
+  { id: "generate-react-component" },
+  { event: "ai/component.generate.requested" },
+  async ({ event, step }) => {
+    // Step 1: Call the LLM API. Retries on failure.
+    const rawOutput = await step.run("call-llm", async () => {
+      return await callLLM(event.data.prompt);
+    });
+
+    // Step 2: Parse the code from the response.
+    const code = await step.run("parse-code", ...);
+
+    // Step 3: Fan-out to trigger a separate validation function.
+    await step.sendEvent("send-for-validation", {
+      name: "ai/code.validation.requested",
+      data: { code, projectId: event.data.projectId },
+    });
+
+    return { message: "Generation in progress..." };
+  }
+);`,
+                validate: `export const validateCode = inngest.createFunction(
+  { id: "validate-generated-code" },
+  { event: "ai/code.validation.requested" },
+  async ({ event, step }) => {
+    const validationResult = await step.run("run-validation", ...);
+
+    if (!validationResult.success) {
+      // Trigger a self-refinement loop if validation fails
+      await step.sendEvent("trigger-refinement", ...);
+      throw new Error("Validation failed.");
+    }
+
+    // Save successful code to the database
+    await step.run("save-to-db", ...);
+
+    return { status: "Validation successful" };
+  }
+);`
+            };
+            
+            // Modal controls
+            const modal = document.getElementById('modal');
+            const modalContent = document.getElementById('modal-content');
+            
+            function showModal(content) {
+                modalContent.innerHTML = content;
+                modal.classList.add('visible');
+            }
+
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal || e.target.id === 'close-modal-btn') {
+                    modal.classList.remove('visible');
+                }
+            });
+
+            // Render Radar Chart
+            const ctx = document.getElementById('competitiveChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'radar',
+                data: competitiveData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            angleLines: { color: '#334155' },
+                            grid: { color: '#334155' },
+                            pointLabels: { font: { size: 12, weight: '500' }, color: '#cbd5e1' },
+                            ticks: { backdropColor: '#1e293b', color: '#94a3b8', stepSize: 1 },
+                            min: 0,
+                            max: 3
+                        }
+                    },
+                    plugins: { legend: { position: 'top', labels: { color: '#e2e8f0' } } }
+                }
+            });
+
+            // Render Pipeline
+            const pipelineContainer = document.getElementById('pipeline-container');
+            pipelineSteps.forEach(step => {
+                const stepEl = document.createElement('div');
+                stepEl.className = 'flowchart-step text-center p-4 rounded-lg border-2 border-slate-700 bg-slate-800 w-full lg:w-1/6 cursor-pointer hover:border-sky-500 hover:bg-slate-700 transition';
+                stepEl.innerHTML = `<h4 class="font-semibold text-slate-100">${step.title}</h4>`;
+                stepEl.addEventListener('click', () => {
+                    const modalHTML = `
+                        <h3 class="text-xl font-bold mb-4 text-sky-400">${step.title}</h3>
+                        <p class="text-slate-300">${step.description}</p>
+                        <button id="close-modal-btn" class="mt-6 bg-sky-600 text-white px-4 py-2 rounded-lg hover:bg-sky-700">Close</button>
+                    `;
+                    showModal(modalHTML);
+                });
+                pipelineContainer.appendChild(stepEl);
+            });
+
+            // Render DB Schema with AI Explainer
+            const dbSchemaContainer = document.getElementById('db-schema-diagram');
+            Object.keys(dbSchema).forEach(tableName => {
+                const tableEl = document.createElement('div');
+                tableEl.className = 'db-table p-6 rounded-lg';
+                tableEl.innerHTML = `<h4 class="text-xl font-bold text-slate-100">${tableName}</h4><p class="text-sm text-slate-400 mt-2">${dbSchema[tableName].description}</p>`;
+                tableEl.addEventListener('click', () => {
+                    const modalHTML = `
+                        <h3 class="text-xl font-bold mb-4 text-sky-400">${tableName} Schema</h3>
+                        <pre class="bg-slate-900 p-4 rounded-md"><code class="language-prisma text-sm">${dbSchema[tableName].code.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></pre>
+                        <div class="mt-4">
+                            <button id="explain-schema-btn" class="gemini-button text-sm">✨ Explain this Schema</button>
+                            <div id="schema-explanation" class="mt-4 text-slate-300 bg-slate-900/50 p-4 rounded-lg hidden"></div>
+                        </div>
+                        <button id="close-modal-btn" class="mt-6 bg-sky-600 text-white px-4 py-2 rounded-lg hover:bg-sky-700">Close</button>
+                    `;
+                    showModal(modalHTML);
+
+                    const explainBtn = document.getElementById('explain-schema-btn');
+                    const explanationDiv = document.getElementById('schema-explanation');
+                    explainBtn.addEventListener('click', async () => {
+                        explainBtn.disabled = true;
+                        explanationDiv.classList.remove('hidden');
+                        explanationDiv.innerHTML = 'Thinking...';
+                        const prompt = `Explain the following Prisma schema in simple terms for a non-technical person. Focus on its purpose and how the models relate to each other:\n\n${dbSchema[tableName].code}`;
+                        const explanation = await callGemini(prompt);
+                        explanationDiv.innerHTML = explanation.replace(/\n/g, '<br>');
+                        explainBtn.disabled = false;
+                    });
+                });
+                dbSchemaContainer.appendChild(tableEl);
+            });
+
+            // Inngest Workflow Interaction
+            const inngestCodeDisplay = document.getElementById('inngest-code-display');
+            const inngestCodeBlock = inngestCodeDisplay.querySelector('code');
+            
+            document.getElementById('inngest-generate').addEventListener('click', () => {
+                inngestCodeBlock.innerHTML = inngestCode.generate.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                inngestCodeDisplay.classList.remove('hidden');
+            });
+
+            document.getElementById('inngest-validate').addEventListener('click', () => {
+                inngestCodeBlock.innerHTML = inngestCode.validate.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                inngestCodeDisplay.classList.remove('hidden');
+            });
+
+            // GTM Strategy Generator
+            const gtmButton = document.getElementById('gtm-button');
+            const gtmInput = document.getElementById('gtm-input');
+            const gtmOutput = document.getElementById('gtm-output');
+
+            gtmButton.addEventListener('click', async () => {
+                const audience = gtmInput.value.trim();
+                if (!audience) {
+                    gtmOutput.innerHTML = "Please enter a target audience first.";
+                    return;
+                }
+
+                gtmButton.disabled = true;
+                gtmOutput.innerHTML = "Brainstorming with AI...";
+
+                const prompt = `Generate a creative, actionable Go-to-Market (GTM) strategy for a new AI-powered website builder. The target audience is specifically "${audience}". Provide 3-5 distinct strategies with brief explanations for each. Format the output as a simple list.`;
+                const strategy = await callGemini(prompt);
+                gtmOutput.innerHTML = strategy.replace(/\n/g, '<br>');
+                gtmButton.disabled = false;
+            });
+
+            // AI Project Scaffolder
+            const scaffoldButton = document.getElementById('scaffold-button');
+            const scaffoldInput = document.getElementById('scaffold-input');
+            const scaffoldOutput = document.getElementById('scaffold-output');
+
+            scaffoldButton.addEventListener('click', async () => {
+                const projectDesc = scaffoldInput.value.trim();
+                if (!projectDesc) {
+                    scaffoldOutput.innerHTML = "Please describe the project you want to build.";
+                    return;
+                }
+                scaffoldButton.disabled = true;
+                scaffoldOutput.innerHTML = "Scaffolding with AI...";
+
+                const prompt = `I am planning a new SaaS application. Based on the following description, please suggest a database schema structure and a list of REST API endpoints.
+
+Project Description: "${projectDesc}"
+
+Please provide the output in two sections using Markdown:
+1.  **Recommended Database Models:** List the primary models with key fields.
+2.  **Recommended API Endpoints:** List key endpoints using the format (e.g., GET /api/users).`;
+
+                const scaffold = await callGemini(prompt);
+                scaffoldOutput.innerHTML = scaffold
+                    .replace(/\n/g, '<br>')
+                    .replace(/\*\*(.*?)\*\*/g, '<strong class="text-sky-400">$1</strong>')
+                    .replace(/`([^`]+)`/g, '<code class="bg-slate-700 px-1 py-0.5 rounded">$1</code>');
+                scaffoldButton.disabled = false;
+            });
+            
+            // Mobile navigation
+            const mobileNav = document.getElementById('mobile-nav');
+            mobileNav.addEventListener('change', (e) => {
+                window.location.hash = e.target.value;
+            });
+
+            // Active nav link highlighting on scroll
+            const sections = document.querySelectorAll('section');
+            const navLinks = document.querySelectorAll('.nav-link');
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        navLinks.forEach(link => {
+                            link.classList.toggle('active', link.getAttribute('href').substring(1) === entry.target.id);
+                        });
+                    }
+                });
+            }, { rootMargin: "-50% 0px -50% 0px" });
+
+            sections.forEach(section => observer.observe(section));
+
+            // Sparkle effect
+            const sparkleContainer = document.getElementById('sparkle-container');
+            const sparkleCount = 50;
+            for (let i = 0; i < sparkleCount; i++) {
+                const sparkle = document.createElement('div');
+                sparkle.className = 'sparkle';
+                sparkle.style.top = `${Math.random() * 100}%`;
+                sparkle.style.left = `${Math.random() * 100}%`;
+                sparkle.style.animationDelay = `${Math.random() * 5}s`;
+                sparkle.style.animationDuration = `${3 + Math.random() * 4}s`;
+                sparkleContainer.appendChild(sparkle);
+            }
+        });
+    </script>
+</body>
+</html>
